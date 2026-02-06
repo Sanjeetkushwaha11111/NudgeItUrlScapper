@@ -23,6 +23,11 @@ const HEADERS = [
   "deliveryDate",
   "currency",
   "source",
+  "priceFrom",
+  "isPricePlausible",
+  "needsReview",
+  "errorCode",
+  "errorMessage",
 ];
 
 function csvEscape(value) {

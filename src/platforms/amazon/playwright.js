@@ -1,6 +1,7 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
+const { PLAYWRIGHT_POLICY } = require("../../config/playwrightPolicy");
 
 function parseMoney(text) {
   if (!text) return null;
@@ -77,7 +78,7 @@ async function getFirstVisibleText(page, selectors) {
   return null;
 }
 
-async function quickClick(page, selector, timeout = 1200) {
+async function quickClick(page, selector, timeout = PLAYWRIGHT_POLICY.common.clickTimeoutMs) {
   return page.locator(selector).first().click({ timeout }).then(() => true).catch(() => false);
 }
 
@@ -111,11 +112,11 @@ async function tryApplyAmazonPincode(page, pincode) {
     "#GLUXZipUpdate .a-button-input",
   ];
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < PLAYWRIGHT_POLICY.amazon.pincodeApplyRetries; attempt++) {
     for (const selector of triggerSelectors) {
-      await quickClick(page, selector, 1000);
+      await quickClick(page, selector, PLAYWRIGHT_POLICY.amazon.pincodeTriggerClickTimeoutMs);
     }
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(PLAYWRIGHT_POLICY.amazon.pincodeTriggerSettleMs);
 
     let inputFound = false;
     for (const selector of inputSelectors) {
@@ -129,22 +130,22 @@ async function tryApplyAmazonPincode(page, pincode) {
     }
 
     if (!inputFound) {
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(PLAYWRIGHT_POLICY.amazon.pincodeInputRetryWaitMs);
       continue;
     }
 
     for (const selector of submitSelectors) {
-      await quickClick(page, selector, 1200);
+      await quickClick(page, selector, PLAYWRIGHT_POLICY.common.clickTimeoutMs);
     }
 
     await page
       .waitForFunction(
         (pin) => (document.body?.innerText || "").includes(pin),
         pincode,
-        { timeout: 6000 }
+        { timeout: PLAYWRIGHT_POLICY.amazon.pincodeVerifyTimeoutMs }
       )
       .catch(() => {});
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(PLAYWRIGHT_POLICY.amazon.pincodePostApplyWaitMs);
 
     const applied = await getDeliveryPincodeFromPage(page);
     if (applied === pincode) return true;
@@ -197,20 +198,28 @@ function findProductFromJsonLd(blocks) {
 }
 
 async function scrapeAmazon(url, options = {}) {
+  const useFreshContext = options.useFreshContext !== false;
+  const debugDumpOnFailure = options.debugDumpOnFailure !== false;
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({
+  const contextOptions = {
     locale: "en-IN",
     userAgent:
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-  });
+  };
+  const context = useFreshContext ? await browser.newContext(contextOptions) : null;
+  const page = context ? await context.newPage() : await browser.newPage(contextOptions);
 
   try {
-    const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForTimeout(2000);
+    const resp = await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: PLAYWRIGHT_POLICY.common.navigationTimeoutMs,
+    });
+    await page.waitForTimeout(PLAYWRIGHT_POLICY.common.postNavigationWaitMs);
 
     const debug = {
       finalUrl: page.url(),
       status: resp ? resp.status() : null,
+      useFreshContext,
     };
 
     const pincode = options.pincode ? String(options.pincode).trim() : "";
@@ -321,7 +330,7 @@ async function scrapeAmazon(url, options = {}) {
       source: fromLd ? "playwright:jsonld" : "playwright:dom",
     };
 
-    if (!result.price) {
+    if (!result.price && debugDumpOnFailure) {
       const outDir = path.join(process.cwd(), "pw_debug");
       fs.mkdirSync(outDir, { recursive: true });
       fs.writeFileSync(path.join(outDir, "amazon_page.html"), await page.content());
@@ -333,6 +342,9 @@ async function scrapeAmazon(url, options = {}) {
     return result;
   } finally {
     await page.close().catch(() => {});
+    if (context) {
+      await context.close().catch(() => {});
+    }
     await browser.close().catch(() => {});
   }
 }
