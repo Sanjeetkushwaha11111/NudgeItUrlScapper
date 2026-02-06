@@ -11,12 +11,24 @@ async function promptInput() {
   const mobile = (await rl.question("Mobile number: ")).trim();
   const trackingId = (await rl.question("Tracking ID: ")).trim();
   const methodInput = (await rl.question("Method (auto/http/playwright): ")).trim();
+  const freshContextInput = (await rl.question("Fresh context? (y/n, default y): ")).trim();
+  const debugDumpInput = (await rl.question("Debug dump on fail? (y/n, default y): ")).trim();
 
   rl.close();
 
   const normalized = methodInput ? methodInput.toLowerCase() : "auto";
   const method = ["auto", "http", "playwright"].includes(normalized) ? normalized : "auto";
-  return { url, pincode, mobile, trackingId, trackingMethod: method };
+  const useFreshContext = freshContextInput ? freshContextInput.toLowerCase() !== "n" : true;
+  const debugDumpOnFailure = debugDumpInput ? debugDumpInput.toLowerCase() !== "n" : true;
+  return {
+    url,
+    pincode,
+    mobile,
+    trackingId,
+    trackingMethod: method,
+    useFreshContext,
+    debugDumpOnFailure,
+  };
 }
 
 async function run() {
@@ -31,6 +43,8 @@ async function run() {
   const result = await scrape(inputData.url, {
     trackingMethod: inputData.trackingMethod,
     pincode: inputData.pincode,
+    useFreshContext: inputData.useFreshContext,
+    debugDumpOnFailure: inputData.debugDumpOnFailure,
   });
 
   console.log(result);
@@ -57,6 +71,11 @@ async function run() {
     inStock: result.inStock,
     currency: result.currency,
     source: result.source,
+    priceFrom: result.resultValidation?.priceFrom ?? null,
+    isPricePlausible: result.resultValidation?.isPricePlausible ?? null,
+    needsReview: result.resultValidation?.needsReview ?? null,
+    errorCode: result.errorCode,
+    errorMessage: result.errorMessage,
   });
 }
 
