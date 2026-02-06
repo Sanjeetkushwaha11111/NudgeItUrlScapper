@@ -64,6 +64,7 @@ function extractProductFromJsonLd($) {
 
       return {
         title: item.name || null,
+        productId: item.sku || item.productID || item.mpn || item.asin || null,
         price,
         currency,
         inStock,
@@ -74,10 +75,31 @@ function extractProductFromJsonLd($) {
   return null;
 }
 
+function extractAmazonAsin(text) {
+  if (!text) return null;
+
+  const patterns = [
+    /\/dp\/([A-Z0-9]{10})(?:[/?]|$)/i,
+    /\/gp\/product\/([A-Z0-9]{10})(?:[/?]|$)/i,
+    /\/product\/([A-Z0-9]{10})(?:[/?]|$)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = String(text).match(pattern);
+    if (match) return match[1].toUpperCase();
+  }
+
+  return null;
+}
+
 function parse(html) {
   const $ = cheerio.load(html);
 
   const fromLd = extractProductFromJsonLd($);
+  const canonicalHref =
+    $("link[rel='canonical']").attr("href") ||
+    $("meta[property='og:url']").attr("content") ||
+    "";
 
   const titleDom = firstText($, ["#productTitle", "h1"]);
   const priceDom = firstText($, [
@@ -101,7 +123,7 @@ function parse(html) {
 
   return {
     title: fromLd?.title || titleDom || null,
-    productId: null,
+    productId: fromLd?.productId || extractAmazonAsin(canonicalHref),
     price: fromLd?.price ?? parseMoney(priceDom),
     mrp: parseMoney(mrpDom),
     inStock: typeof fromLd?.inStock === "boolean" ? fromLd.inStock : inStockDom,
