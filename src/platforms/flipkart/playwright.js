@@ -2,8 +2,10 @@ const { chromium } = require("playwright");
 const { toNumber } = require("../../utils/number");
 const fs = require("fs");
 const path = require("path");
+const { PLAYWRIGHT_POLICY } = require("../../config/playwrightPolicy");
 
 async function scrapeFlipkart(url, options = {}) {
+  const debugDumpOnFailure = options.debugDumpOnFailure !== false;
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
     locale: "en-IN",
@@ -12,8 +14,11 @@ async function scrapeFlipkart(url, options = {}) {
   });
 
   try {
-    const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForTimeout(2000);
+    const resp = await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: PLAYWRIGHT_POLICY.common.navigationTimeoutMs,
+    });
+    await page.waitForTimeout(PLAYWRIGHT_POLICY.common.postNavigationWaitMs);
 
     const debug = {
       finalUrl: page.url(),
@@ -27,7 +32,7 @@ async function scrapeFlipkart(url, options = {}) {
         await pinInput.first().fill(pincode).catch(() => {});
         await pinInput.first().press("Enter").catch(() => {});
         await page.locator("span:has-text('Check')").first().click().catch(() => {});
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(PLAYWRIGHT_POLICY.flipkart.pincodePostApplyWaitMs);
       }
     }
 
@@ -128,7 +133,7 @@ async function scrapeFlipkart(url, options = {}) {
         : null;
 
     // If still missing critical fields, dump debug artifacts
-    if (!price) {
+    if (!price && debugDumpOnFailure) {
       const outDir = path.join(process.cwd(), "pw_debug");
       fs.mkdirSync(outDir, { recursive: true });
       fs.writeFileSync(path.join(outDir, "page.html"), await page.content());

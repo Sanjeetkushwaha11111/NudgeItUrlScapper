@@ -5,6 +5,27 @@ const amazonHttp = require("./platforms/amazon");
 const { scrapeFlipkart } = require("./platforms/flipkart/playwright");
 const { scrapeAmazon } = require("./platforms/amazon/playwright");
 
+const MAX_REASONABLE_PRICE_INR = 5000000;
+
+function normalizeError(err) {
+  if (!err) {
+    return { errorCode: "PLAYWRIGHT_FAILED", errorMessage: "playwright_failed" };
+  }
+
+  const rawCode = err.code || err.name || "PLAYWRIGHT_FAILED";
+  const errorCode = String(rawCode).toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+  const errorMessage = err.message ? String(err.message) : "playwright_failed";
+
+  return { errorCode, errorMessage };
+}
+
+function getPriceFromSource(source) {
+  if (!source) return null;
+  if (String(source).includes(":jsonld")) return "jsonld";
+  if (String(source).includes(":dom")) return "dom";
+  return null;
+}
+
 async function scrape(url, options = {}) {
   const info = normalize(url);
 
@@ -16,7 +37,8 @@ async function scrape(url, options = {}) {
 
   let data = {};
   let source = "http";
-  let error = null;
+  let errorCode = null;
+  let errorMessage = null;
 
   switch (info.platform) {
     case "flipkart": {
@@ -24,12 +46,15 @@ async function scrape(url, options = {}) {
         try {
           const pw = await scrapeFlipkart(info.canonicalUrl, {
             pincode: options.pincode,
+            debugDumpOnFailure: options.debugDumpOnFailure,
           });
           data = { ...data, ...pw };
           source = data.source || "playwright";
         } catch (err) {
           source = "playwright:error";
-          error = err && err.message ? err.message : "playwright_failed";
+          const details = normalizeError(err);
+          errorCode = details.errorCode;
+          errorMessage = details.errorMessage;
         }
         break;
       }
@@ -46,10 +71,16 @@ async function scrape(url, options = {}) {
         try {
           const pw = await scrapeFlipkart(info.canonicalUrl, {
             pincode: options.pincode,
+            debugDumpOnFailure: options.debugDumpOnFailure,
           });
           data = { ...data, ...pw };
           source = data.source || "playwright";
-        } catch {}
+        } catch (err) {
+          source = "playwright:error";
+          const details = normalizeError(err);
+          errorCode = details.errorCode;
+          errorMessage = details.errorMessage;
+        }
       }
 
       break;
@@ -61,6 +92,8 @@ async function scrape(url, options = {}) {
         try {
           const pw = await scrapeAmazon(info.canonicalUrl, {
             pincode: options.pincode,
+            useFreshContext: options.useFreshContext !== false,
+            debugDumpOnFailure: options.debugDumpOnFailure,
           });
           data = { ...data, ...pw };
           if (!data.productId && pw?.debug?.finalUrl) {
@@ -70,7 +103,9 @@ async function scrape(url, options = {}) {
           source = data.source || "playwright";
         } catch (err) {
           source = "playwright:error";
-          error = err && err.message ? err.message : "playwright_failed";
+          const details = normalizeError(err);
+          errorCode = details.errorCode;
+          errorMessage = details.errorMessage;
         }
         break;
       }
@@ -93,6 +128,8 @@ async function scrape(url, options = {}) {
         try {
           const pw = await scrapeAmazon(info.canonicalUrl, {
             pincode: options.pincode,
+            useFreshContext: options.useFreshContext !== false,
+            debugDumpOnFailure: options.debugDumpOnFailure,
           });
           data = { ...data, ...pw };
           if (!data.productId && pw?.debug?.finalUrl) {
@@ -100,7 +137,12 @@ async function scrape(url, options = {}) {
             data.productId = resolved.productId || data.productId || null;
           }
           source = data.source || "playwright";
-        } catch {}
+        } catch (err) {
+          source = "playwright:error";
+          const details = normalizeError(err);
+          errorCode = details.errorCode;
+          errorMessage = details.errorMessage;
+        }
       }
 
       break;
@@ -110,17 +152,28 @@ async function scrape(url, options = {}) {
        break;
   }
 
+  const requestedPincode = data.requestedPincode || (options.pincode || null);
+  const requestedPincodeApplied =
+    typeof data.requestedPincodeApplied === "boolean" ? data.requestedPincodeApplied : null;
+  const price = data.price ?? null;
+  const priceFrom = getPriceFromSource(source);
+  const isPricePlausible =
+    typeof price === "number" && Number.isFinite(price) && price > 0 && price <= MAX_REASONABLE_PRICE_INR;
+  const needsReview =
+    price == null ||
+    !isPricePlausible ||
+    (/^\d{6}$/.test(String(options.pincode || "").trim()) && requestedPincodeApplied !== true);
+
   return {
     platform: info.platform,
     productId: data.productId || info.productId || null,
     title: data.title || null,
-    price: data.price ?? null,
+    price,
     mrp: data.mrp ?? null,
     inStock: typeof data.inStock === "boolean" ? data.inStock : null,
-    requestedPincode: data.requestedPincode || (options.pincode || null),
+    requestedPincode,
     deliveryPincode: data.deliveryPincode || null,
-    requestedPincodeApplied:
-      typeof data.requestedPincodeApplied === "boolean" ? data.requestedPincodeApplied : null,
+    requestedPincodeApplied,
     deliverableForRequestedPincode:
       typeof data.deliverableForRequestedPincode === "boolean"
         ? data.deliverableForRequestedPincode
@@ -133,7 +186,13 @@ async function scrape(url, options = {}) {
     timestamp: new Date().toISOString(),
     confidence: data.price && data.title ? 0.9 : 0.4,
     source,
-    error,
+    resultValidation: {
+      priceFrom,
+      isPricePlausible,
+      needsReview,
+    },
+    errorCode,
+    errorMessage,
   };
 }
 
