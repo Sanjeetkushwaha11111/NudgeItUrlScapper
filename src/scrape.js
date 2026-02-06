@@ -3,6 +3,7 @@ const { httpFetch, httpFetchWithMeta } = require("./http/fetch");
 const flipkartHttp = require("./platforms/flipkart");
 const amazonHttp = require("./platforms/amazon");
 const { scrapeFlipkart } = require("./platforms/flipkart/playwright");
+const { scrapeAmazon } = require("./platforms/amazon/playwright");
 
 async function scrape(url, options = {}) {
   const info = normalize(url);
@@ -52,18 +53,48 @@ async function scrape(url, options = {}) {
 
     case "amazon.in":
     case "amazon": {
-      // HTTP parse for Amazon with redirect-aware final URL resolution.
-      try {
-        const { html, finalUrl } = await httpFetchWithMeta(info.canonicalUrl);
-        if (amazonHttp && typeof amazonHttp.parse === "function") {
-          data = amazonHttp.parse(html);
-        }
-        if (!data.productId && finalUrl) {
-          const resolved = normalize(finalUrl);
-          data.productId = resolved.productId || data.productId || null;
-        }
-        source = data.source || "http";
-      } catch {}
+      if (usePlaywright) {
+        try {
+          const pw = await scrapeAmazon(info.canonicalUrl, {
+            pincode: options.pincode,
+          });
+          data = { ...data, ...pw };
+          if (!data.productId && pw?.debug?.finalUrl) {
+            const resolved = normalize(pw.debug.finalUrl);
+            data.productId = resolved.productId || data.productId || null;
+          }
+          source = data.source || "playwright";
+        } catch {}
+        break;
+      }
+
+      if (useHttp || trackingMethod === "auto") {
+        try {
+          const { html, finalUrl } = await httpFetchWithMeta(info.canonicalUrl);
+          if (amazonHttp && typeof amazonHttp.parse === "function") {
+            data = amazonHttp.parse(html);
+          }
+          if (!data.productId && finalUrl) {
+            const resolved = normalize(finalUrl);
+            data.productId = resolved.productId || data.productId || null;
+          }
+          source = data.source || "http";
+        } catch {}
+      }
+
+      if (trackingMethod === "auto" && !data.price) {
+        try {
+          const pw = await scrapeAmazon(info.canonicalUrl, {
+            pincode: options.pincode,
+          });
+          data = { ...data, ...pw };
+          if (!data.productId && pw?.debug?.finalUrl) {
+            const resolved = normalize(pw.debug.finalUrl);
+            data.productId = resolved.productId || data.productId || null;
+          }
+          source = data.source || "playwright";
+        } catch {}
+      }
 
       break;
     }

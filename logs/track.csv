@@ -20,3 +20,14 @@ timestamp,url,pincode,mobile,id,trackingMethod,platform,productId,title,price,mr
 2026-02-06T16:15:30.047Z,https://www.amazon.com/dp/B0FSCDTLL9/ref=sspa_dk_detail_5?pf_rd_p=bbb3fb5e-28ad-4062-a3ba-1f7b9f2e4371&pf_rd_r=4M6S59JCC5XMFVN428FM&pd_rd_wg=AJIhk&pd_rd_w=IA0Sz&content-id=amzn1.sym.bbb3fb5e-28ad-4062-a3ba-1f7b9f2e4371&pd_rd_r=347d0105-061a-4730-8ae7-80256a2e6824&sp_csd=d2lkZ2V0TmFtZT1zcF9kZXRhaWxfdGhlbWF0aWM&th=1,343431,1324,23132,auto,amazon,B0FSCDTLL9,"16PROMA X 5G Unlocked Phones, Built in Pen, Smartphone Battery 7000mAh 6.8"" HD Screen Unlocked Cell Phone, 12+512GB Android14, Face ID/Fingerprint Lock/GPS (Green)",,,true,,,,INR,http:dom
 2026-02-06T16:18:27.607Z,https://amzn.in/d/04bylCVQ,324214,1324,1123,auto,amazon,B0DJD6F5H9,"Dollar Full Sleeves Bomber Jacket for Men | TPU Men's Standing Collar Lightweight Winter Jacket, Regular Fit",945,3099,true,,,,INR,http:dom
 2026-02-06T16:30:13.823Z,https://amzn.in/d/04bylCVQ,33,32,3,auto,amazon,B0DJD6F5H9,"Dollar Full Sleeves Bomber Jacket for Men | TPU Men's Standing Collar Lightweight Winter Jacket, Regular Fit",945,3099,true,,,,INR,http:dom
+2026-02-06T16:42:54.530Z,https://amzn.in/d/04bylCVQ,343432,12312,21312,playwright,amazon,B0DJD5KD7D,"Dollar Full Sleeves Bomber Jacket for Men | TPU Men's Standing Collar Lightweight Winter Jacket, Regular Fit",,3099,true,true,"FREE delivery Monday, 9 February. Details  Or fastest delivery Sunday, 8 February. Order within 1 hr 47 mins. Details",", 9 February",INR,playwright:dom
+2026-02-06T16:45:01.674Z,https://amzn.in/d/04bylCVQ,343124,2134,132,playwright,amazon,B0DJD5KD7D,"Dollar Full Sleeves Bomber Jacket for Men | TPU Men's Standing Collar Lightweight Winter Jacket, Regular Fit",945,3099,true,true,"FREE delivery Monday, 9 February. Details  Or fastest delivery Sunday, 8 February. Order within 1 hr 45 mins. Details",9 February,INR,playwright:dom
+2026-02-06T16:46:16.245Z,https://amzn.in/d/046uzdfo,312321,21321,21321,playwright,amazon,B0D3Z2BSPB,"Product summary presents key product information     Keyboard shortcut  
+                                        shift
+                                        +
+                                         alt
+                                        +
+                                        opt
+                                        +
+                                        D",129,299,true,true,"FREE delivery Sunday, 8 February on your first order. Details  Or fastest delivery Tomorrow, 7 February. Order within 11 hrs 28 mins. Details",8 February,INR,playwright:dom
+2026-02-06T16:48:58.518Z,https://amzn.in/d/046uzdfo,243532,245432,24352,playwright,amazon,B0D3Z2BSPB,"Scalp Massage, Solar Powered Scalp Massager (Marble Pink), Head Massager, Hair Massager For Hair Growth",129,299,true,true,"FREE delivery Sunday, 8 February on your first order. Details  Or fastest delivery Tomorrow, 7 February. Order within 11 hrs 26 mins. Details",8 February,INR,playwright:dom
