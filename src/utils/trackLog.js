@@ -14,6 +14,9 @@ const HEADERS = [
   "price",
   "mrp",
   "inStock",
+  "deliverable",
+  "deliveryText",
+  "deliveryDate",
   "currency",
   "source",
 ];

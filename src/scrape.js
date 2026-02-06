@@ -20,7 +20,9 @@ async function scrape(url, options = {}) {
     case "flipkart": {
       if (usePlaywright) {
         try {
-          const pw = await scrapeFlipkart(info.canonicalUrl);
+          const pw = await scrapeFlipkart(info.canonicalUrl, {
+            pincode: options.pincode,
+          });
           data = { ...data, ...pw };
           source = data.source || "playwright";
         } catch {}
@@ -37,7 +39,9 @@ async function scrape(url, options = {}) {
 
       if (trackingMethod === "auto" && !data.price) {
         try {
-          const pw = await scrapeFlipkart(info.canonicalUrl);
+          const pw = await scrapeFlipkart(info.canonicalUrl, {
+            pincode: options.pincode,
+          });
           data = { ...data, ...pw };
           source = data.source || "playwright";
         } catch {}
@@ -71,7 +75,11 @@ async function scrape(url, options = {}) {
     price: data.price ?? null,
     mrp: data.mrp ?? null,
     inStock: typeof data.inStock === "boolean" ? data.inStock : null,
+    deliverable: typeof data.deliverable === "boolean" ? data.deliverable : null,
+    deliveryText: data.deliveryText || null,
+    deliveryDate: data.deliveryDate || null,
     currency: data.currency || "INR",
+    trackingMethod,
     timestamp: new Date().toISOString(),
     confidence: data.price && data.title ? 0.9 : 0.4,
     source,

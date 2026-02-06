@@ -3,7 +3,7 @@ const { toNumber } = require("../../utils/number");
 const fs = require("fs");
 const path = require("path");
 
-async function scrapeFlipkart(url) {
+async function scrapeFlipkart(url, options = {}) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
     locale: "en-IN",
@@ -19,6 +19,17 @@ async function scrapeFlipkart(url) {
       finalUrl: page.url(),
       status: resp ? resp.status() : null,
     };
+
+    const pincode = options.pincode ? String(options.pincode).trim() : "";
+    if (/^\d{6}$/.test(pincode)) {
+      const pinInput = page.locator("input#pincodeInputId, input[placeholder*='Pincode']");
+      if (await pinInput.count()) {
+        await pinInput.first().fill(pincode).catch(() => {});
+        await pinInput.first().press("Enter").catch(() => {});
+        await page.locator("span:has-text('Check')").first().click().catch(() => {});
+        await page.waitForTimeout(1500);
+      }
+    }
 
     // IMPORTANT: do NOT wait on a selector. Just "try" and move on.
     const title = await page
@@ -101,6 +112,21 @@ async function scrapeFlipkart(url) {
           .locator("button:has-text('NOTIFY'), button:has-text('NOTIFY ME'), text=Sold Out")
           .count()) === 0;
 
+    const deliveryText = await page
+      .locator("div.X7F9_4, div.DYVp5s, div.Y24VcD, div.HZ0E6r")
+      .first()
+      .textContent()
+      .then((t) => (t ? t.trim() : null))
+      .catch(() => null);
+
+    const deliveryDateMatch =
+      deliveryText && deliveryText.match(/\b\d{1,2}\s+[A-Za-z]{3,9}\b/);
+
+    const deliverable =
+      deliveryText != null
+        ? !/not deliverable|delivery not available|unavailable/i.test(deliveryText)
+        : null;
+
     // If still missing critical fields, dump debug artifacts
     if (!price) {
       const outDir = path.join(process.cwd(), "pw_debug");
@@ -118,6 +144,9 @@ async function scrapeFlipkart(url) {
       price,
       mrp,
       inStock,
+      deliverable,
+      deliveryText: deliveryText || null,
+      deliveryDate: deliveryDateMatch ? deliveryDateMatch[0] : null,
       currency,
       source,
     };

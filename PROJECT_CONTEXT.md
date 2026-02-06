@@ -31,7 +31,7 @@ CLI-based product tracker that scrapes product pages (starting with Flipkart) an
 - `src/platforms/flipkart/`
   - `index.js`: re-export of parser.
   - `parser.js`: JSON-LD + DOM fallback extraction.
-  - `playwright.js`: Playwright-based extraction (JSON-LD first).
+  - `playwright.js`: Playwright-based extraction (JSON-LD first) + pincode delivery info.
 - `src/platforms/amazon/index.js`: placeholder for Amazon parser.
 - `src/utils/number.js`: `toNumber` helper.
 - `src/utils/trackLog.js`: CSV logger for Excel.
@@ -44,11 +44,14 @@ CLI-based product tracker that scrapes product pages (starting with Flipkart) an
 ## Data Fields
 Returned by `scrape()`:
 - `platform`, `productId`, `title`, `price`, `mrp`, `inStock`, `currency`
+- `deliverable`, `deliveryText`, `deliveryDate`
 - `trackingMethod`, `timestamp`, `source`
 
 Logged to CSV:
 - `timestamp`, `url`, `pincode`, `mobile`, `id`, `trackingMethod`
-- `platform`, `productId`, `title`, `price`, `mrp`, `inStock`, `currency`, `source`
+- `platform`, `productId`, `title`, `price`, `mrp`, `inStock`
+- `deliverable`, `deliveryText`, `deliveryDate`
+- `currency`, `source`
 
 ## Notes
 - Flipkart selectors can change; JSON-LD is the most stable.

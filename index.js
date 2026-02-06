@@ -30,6 +30,7 @@ async function run() {
 
   const result = await scrape(inputData.url, {
     trackingMethod: inputData.trackingMethod,
+    pincode: inputData.pincode,
   });
 
   console.log(result);
@@ -41,6 +42,9 @@ async function run() {
     mobile: inputData.mobile,
     id: inputData.trackingId,
     trackingMethod: inputData.trackingMethod,
+    deliverable: result.deliverable,
+    deliveryText: result.deliveryText,
+    deliveryDate: result.deliveryDate,
     platform: result.platform,
     productId: result.productId,
     title: result.title,
