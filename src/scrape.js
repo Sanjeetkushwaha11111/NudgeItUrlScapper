@@ -16,6 +16,7 @@ async function scrape(url, options = {}) {
 
   let data = {};
   let source = "http";
+  let error = null;
 
   switch (info.platform) {
     case "flipkart": {
@@ -26,7 +27,10 @@ async function scrape(url, options = {}) {
           });
           data = { ...data, ...pw };
           source = data.source || "playwright";
-        } catch {}
+        } catch (err) {
+          source = "playwright:error";
+          error = err && err.message ? err.message : "playwright_failed";
+        }
         break;
       }
 
@@ -64,7 +68,10 @@ async function scrape(url, options = {}) {
             data.productId = resolved.productId || data.productId || null;
           }
           source = data.source || "playwright";
-        } catch {}
+        } catch (err) {
+          source = "playwright:error";
+          error = err && err.message ? err.message : "playwright_failed";
+        }
         break;
       }
 
@@ -110,6 +117,14 @@ async function scrape(url, options = {}) {
     price: data.price ?? null,
     mrp: data.mrp ?? null,
     inStock: typeof data.inStock === "boolean" ? data.inStock : null,
+    requestedPincode: data.requestedPincode || (options.pincode || null),
+    deliveryPincode: data.deliveryPincode || null,
+    requestedPincodeApplied:
+      typeof data.requestedPincodeApplied === "boolean" ? data.requestedPincodeApplied : null,
+    deliverableForRequestedPincode:
+      typeof data.deliverableForRequestedPincode === "boolean"
+        ? data.deliverableForRequestedPincode
+        : null,
     deliverable: typeof data.deliverable === "boolean" ? data.deliverable : null,
     deliveryText: data.deliveryText || null,
     deliveryDate: data.deliveryDate || null,
@@ -118,6 +133,7 @@ async function scrape(url, options = {}) {
     timestamp: new Date().toISOString(),
     confidence: data.price && data.title ? 0.9 : 0.4,
     source,
+    error,
   };
 }
 

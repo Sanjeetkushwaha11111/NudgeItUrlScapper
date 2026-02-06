@@ -62,6 +62,97 @@ async function getTitleFromDom(page) {
   return null;
 }
 
+async function getFirstVisibleText(page, selectors) {
+  for (const selector of selectors) {
+    const nodes = page.locator(selector);
+    const count = await nodes.count().catch(() => 0);
+    for (let i = 0; i < count; i++) {
+      const node = nodes.nth(i);
+      const visible = await node.isVisible().catch(() => false);
+      if (!visible) continue;
+      const text = await node.textContent().catch(() => null);
+      if (text && text.trim()) return text.trim();
+    }
+  }
+  return null;
+}
+
+async function quickClick(page, selector, timeout = 1200) {
+  return page.locator(selector).first().click({ timeout }).then(() => true).catch(() => false);
+}
+
+async function getDeliveryPincodeFromPage(page) {
+  const text = await getFirstVisibleText(page, [
+    "#contextualIngressPtLabel_deliveryShortLine",
+    "#glow-ingress-line2",
+    "#glow-ingress-line1",
+    "#deliveryBlockMessage",
+  ]);
+  const match = text && text.match(/\b\d{6}\b/);
+  return match ? match[0] : null;
+}
+
+async function tryApplyAmazonPincode(page, pincode) {
+  const triggerSelectors = [
+    "#glow-ingress-block",
+    "#nav-global-location-popover-link",
+    "#contextualIngressPtLabel",
+    "#glow-ingress-line2",
+  ];
+  const inputSelectors = [
+    "input#GLUXZipUpdateInput",
+    "input[name='zipCode']",
+    "input[placeholder*='PIN']",
+    "input[placeholder*='pincode']",
+  ];
+  const submitSelectors = [
+    "#GLUXZipUpdate-announce",
+    "#GLUXZipUpdate input.a-button-input",
+    "#GLUXZipUpdate .a-button-input",
+  ];
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    for (const selector of triggerSelectors) {
+      await quickClick(page, selector, 1000);
+    }
+    await page.waitForTimeout(400);
+
+    let inputFound = false;
+    for (const selector of inputSelectors) {
+      const input = page.locator(selector).first();
+      if (await input.count().catch(() => 0)) {
+        await input.fill(pincode).catch(() => {});
+        await input.press("Enter").catch(() => {});
+        inputFound = true;
+        break;
+      }
+    }
+
+    if (!inputFound) {
+      await page.waitForTimeout(500);
+      continue;
+    }
+
+    for (const selector of submitSelectors) {
+      await quickClick(page, selector, 1200);
+    }
+
+    await page
+      .waitForFunction(
+        (pin) => (document.body?.innerText || "").includes(pin),
+        pincode,
+        { timeout: 6000 }
+      )
+      .catch(() => {});
+    await page.waitForTimeout(700);
+
+    const applied = await getDeliveryPincodeFromPage(page);
+    if (applied === pincode) return true;
+  }
+
+  return false;
+}
+
 function findProductFromJsonLd(blocks) {
   for (const block of blocks) {
     try {
@@ -123,15 +214,9 @@ async function scrapeAmazon(url, options = {}) {
     };
 
     const pincode = options.pincode ? String(options.pincode).trim() : "";
+    let pincodeAppliedByFlow = null;
     if (/^\d{6}$/.test(pincode)) {
-      const pinInput = page.locator(
-        "input#GLUXZipUpdateInput, input[name='zipCode'], input[placeholder*='PIN'], input[placeholder*='pincode']"
-      );
-      if (await pinInput.count()) {
-        await pinInput.first().fill(pincode).catch(() => {});
-        await page.locator("#GLUXZipUpdate-announce, input.a-button-input").first().click().catch(() => {});
-        await page.waitForTimeout(1800);
-      }
+      pincodeAppliedByFlow = await tryApplyAmazonPincode(page, pincode);
     }
 
     const jsonLdBlocks = await page
@@ -144,18 +229,22 @@ async function scrapeAmazon(url, options = {}) {
     const titleDom = await getTitleFromDom(page);
     const priceDom = await page
       .locator(
-        "#priceblock_ourprice, #priceblock_dealprice, #priceblock_saleprice, #corePrice_feature_div .a-price .a-offscreen, span.a-price .a-offscreen"
+        "#priceblock_ourprice, #priceblock_dealprice, #priceblock_saleprice, #corePriceDisplay_desktop_feature_div .a-price .a-offscreen, #corePrice_feature_div .a-price .a-offscreen, #apex_desktop .a-price .a-offscreen, #apex_offerDisplay_desktop .a-price .a-offscreen, #tp_price_block_total_price_ww .a-offscreen, #price_inside_buybox"
       )
       .first()
       .textContent()
       .catch(() => null);
     const priceWholeDom = await page
-      .locator("#corePrice_feature_div .a-price-whole, span.a-price-whole")
+      .locator(
+        "#corePriceDisplay_desktop_feature_div .a-price-whole, #corePrice_feature_div .a-price-whole, #apex_desktop .a-price-whole, #apex_offerDisplay_desktop .a-price-whole"
+      )
       .first()
       .textContent()
       .catch(() => null);
     const priceFractionDom = await page
-      .locator("#corePrice_feature_div .a-price-fraction, span.a-price-fraction")
+      .locator(
+        "#corePriceDisplay_desktop_feature_div .a-price-fraction, #corePrice_feature_div .a-price-fraction, #apex_desktop .a-price-fraction, #apex_offerDisplay_desktop .a-price-fraction"
+      )
       .first()
       .textContent()
       .catch(() => null);
@@ -174,17 +263,21 @@ async function scrapeAmazon(url, options = {}) {
       .then((t) => (t ? t.trim() : null))
       .catch(() => null);
 
-    const deliveryText = await page
-      .locator(
-        "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE span, #mir-layout-DELIVERY_BLOCK-slot-DELIVERY_MESSAGE span, #deliveryBlockMessage, #contextualIngressPtLabel_deliveryShortLine"
-      )
-      .first()
-      .textContent()
-      .then((t) => (t ? t.trim() : null))
-      .catch(() => null);
+    const deliveryText = await getFirstVisibleText(page, [
+      "#mir-layout-DELIVERY_BLOCK-slot-PRIMARY_DELIVERY_MESSAGE_LARGE span",
+      "#mir-layout-DELIVERY_BLOCK-slot-DELIVERY_MESSAGE span",
+      "#deliveryBlockMessage span",
+      "#deliveryBlockMessage",
+    ]);
 
-    const deliveryDateMatch =
-      deliveryText && deliveryText.match(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+\d{1,2}\s+[A-Za-z]{3,9}\b|\b\d{1,2}\s+[A-Za-z]{3,9}\b/i);
+    const deliveryPincode = await getDeliveryPincodeFromPage(page);
+
+    const monthPattern = "(Jan|January|Feb|February|Mar|March|Apr|April|May|Jun|June|Jul|July|Aug|August|Sep|Sept|September|Oct|October|Nov|November|Dec|December)";
+    const deliveryDateRegex = new RegExp(
+      `\\b(?:Mon|Monday|Tue|Tuesday|Wed|Wednesday|Thu|Thursday|Fri|Friday|Sat|Saturday|Sun|Sunday),?\\s+\\d{1,2}\\s+${monthPattern}\\b|\\b\\d{1,2}\\s+${monthPattern}\\b`,
+      "i"
+    );
+    const deliveryDateMatch = deliveryText && deliveryText.match(deliveryDateRegex);
 
     const inStock =
       typeof fromLd?.inStock === "boolean"
@@ -198,6 +291,18 @@ async function scrapeAmazon(url, options = {}) {
         ? null
         : !/not deliverable|cannot be delivered|unavailable/i.test(deliveryText);
 
+    const requestedPincode = /^\d{6}$/.test(pincode) ? pincode : null;
+    const requestedPincodeApplied =
+      requestedPincode == null
+        ? null
+        : deliveryPincode
+          ? deliveryPincode === requestedPincode
+          : (pincodeAppliedByFlow === true ? true : false);
+    const deliverableForRequestedPincode =
+      requestedPincodeApplied === true
+        ? deliverable
+        : null;
+
     const result = {
       debug,
       title: cleanTitle(fromLd?.title) || titleDom,
@@ -205,6 +310,10 @@ async function scrapeAmazon(url, options = {}) {
       price: fromLd?.price ?? parseMoney(priceDom) ?? parseSplitPrice(priceWholeDom, priceFractionDom),
       mrp: parseMoney(mrpDom),
       inStock,
+      requestedPincode,
+      deliveryPincode: deliveryPincode || null,
+      requestedPincodeApplied,
+      deliverableForRequestedPincode,
       deliverable,
       deliveryText: deliveryText || null,
       deliveryDate: deliveryDateMatch ? deliveryDateMatch[0].replace(/^,\s*/, "").trim() : null,
