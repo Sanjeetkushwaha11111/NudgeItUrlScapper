@@ -1,5 +1,5 @@
 const { normalize } = require("./normalizer");
-const { httpFetch } = require("./http/fetch");
+const { httpFetch, httpFetchWithMeta } = require("./http/fetch");
 const flipkartHttp = require("./platforms/flipkart");
 const amazonHttp = require("./platforms/amazon");
 const { scrapeFlipkart } = require("./platforms/flipkart/playwright");
@@ -52,11 +52,15 @@ async function scrape(url, options = {}) {
 
     case "amazon.in":
     case "amazon": {
-      // Try HTTP parse for Amazon (no Playwright fallback available)
+      // HTTP parse for Amazon with redirect-aware final URL resolution.
       try {
-        const html = await httpFetch(info.canonicalUrl);
+        const { html, finalUrl } = await httpFetchWithMeta(info.canonicalUrl);
         if (amazonHttp && typeof amazonHttp.parse === "function") {
           data = amazonHttp.parse(html);
+        }
+        if (!data.productId && finalUrl) {
+          const resolved = normalize(finalUrl);
+          data.productId = resolved.productId || data.productId || null;
         }
         source = data.source || "http";
       } catch {}
