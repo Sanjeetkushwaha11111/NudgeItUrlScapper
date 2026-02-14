@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: nudgeit_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nudgeit
+      POSTGRES_PASSWORD: nudgeit_pass
+      POSTGRES_DB: nudgeit_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - nudgeit_pgdata:/var/lib/postgresql/data
+
+volumes:
+  nudgeit_pgdata:
