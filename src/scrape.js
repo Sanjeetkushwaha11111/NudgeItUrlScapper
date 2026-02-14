@@ -4,6 +4,7 @@ const flipkartHttp = require("./platforms/flipkart");
 const amazonHttp = require("./platforms/amazon");
 const { scrapeFlipkart } = require("./platforms/flipkart/playwright");
 const { scrapeAmazon } = require("./platforms/amazon/playwright");
+const { toISTISOString } = require("./utils/time");
 
 const MAX_REASONABLE_PRICE_INR = 5000000;
 
@@ -183,7 +184,7 @@ async function scrape(url, options = {}) {
     deliveryDate: data.deliveryDate || null,
     currency: data.currency || "INR",
     trackingMethod,
-    timestamp: new Date().toISOString(),
+    timestamp: toISTISOString(new Date()),
     confidence: data.price && data.title ? 0.9 : 0.4,
     source,
     resultValidation: {

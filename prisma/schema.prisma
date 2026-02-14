@@ -5,10 +5,74 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 generator client {
   provider = "prisma-client-js"
+  engineType = "binary"
 }
 
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+}
+
+
+enum Platform {
+  amazon
+  flipkart
+  unknown
+}
+
+enum TrackStatus {
+  ACTIVE
+  PAUSED
+}
+
+model Track {
+  id             Int        @id @default(autoincrement())
+
+  originalUrl    String
+  canonicalUrl   String
+  platform       Platform   @default(unknown)
+  productId      String?
+
+  intervalMinutes Int       @default(30)
+  trackingMethod  String    @default("auto")
+  status          TrackStatus @default(ACTIVE)
+
+  // latest known state (for quick compare + listing)
+  lastPrice      Int?
+  lastMrp        Int?
+  lastInStock    Boolean?
+  lastCheckedAt  DateTime?
+  nextRunAt      DateTime?
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  snapshots      Snapshot[]
+
+  @@index([platform])
+  @@index([status, nextRunAt])
+}
+
+model Snapshot {
+  id            Int      @id @default(autoincrement())
+  trackId       Int
+  track         Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  price         Int?
+  mrp           Int?
+  inStock       Boolean?
+  currency      String?  @db.VarChar(8)
+
+  title         String?
+  deliverable   Boolean?
+  deliveryText  String?
+  deliveryDate  String?
+
+  source        String?
+  trackingMethod String?
+
+  scrapedAt     DateTime @default(now())
+  raw           Json?
+
+  @@index([trackId, scrapedAt])
 }

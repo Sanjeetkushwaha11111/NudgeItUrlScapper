@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { scrapeUrl } = require('../services/scrapeService');
+const { mapDatesToIST } = require('../../utils/time');
 
 router.post('/', async (req, res) => {
     try {
@@ -15,7 +16,7 @@ router.post('/', async (req, res) => {
             useFreshContext,
             debugDumpOnFailure,
         });
-        return res.json(result);
+        return res.json(mapDatesToIST(result));
     } catch (err) {
         console.error('Scrape error:', err);
         return res.status(500).json({ error: 'scrape_failed', message: err.message });
